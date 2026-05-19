@@ -20,8 +20,16 @@ README.md
 
 Use Python 3.10 ou superior.
 
+Execucao padrao, com resumo final e tabela comparativa:
+
 ```bash
 python app/main.py
+```
+
+Execucao verbose, mostrando produtor, buffer e consumidor:
+
+```bash
+python app/main.py --verbose
 ```
 
 ## O que a simulacao faz
@@ -58,6 +66,8 @@ Cada execucao de scheduler usa uma thread produtora e uma thread consumidora:
 - ao final, a produtora insere um sentinel `None` para encerrar a consumidora.
 
 Essa parte demonstra o paradigma produtor/consumidor sem alterar a ideia central dos algoritmos de escalonamento.
+
+Por padrao, esses logs ficam ocultos para deixar a comparacao final mais limpa. Use `--verbose` para mostrar passo a passo os Pods sendo produzidos, inseridos no buffer, consumidos pelo Master/Scheduler e alocados ou rejeitados.
 
 ## Schedulers
 

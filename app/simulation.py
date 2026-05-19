@@ -61,7 +61,7 @@ def create_pods() -> list[Pod]:
     ]
 
 
-def run_comparison() -> None:
+def run_comparison(verbose: bool = False) -> None:
     base_workers = create_workers()
     base_pods = create_pods()
 
@@ -78,92 +78,118 @@ def run_comparison() -> None:
 
     for scheduler, workers, pods in simulations:
         master = Master("master-1", scheduler.name, workers)
-        results.append(run_simulation(master, pods, scheduler))
+        results.append(run_simulation(master, pods, scheduler, verbose))
 
     print_comparison_table(results)
 
 
-def run_simulation(master: Master, pods: list[Pod], scheduler: Scheduler) -> dict:
+def run_simulation(
+    master: Master, pods: list[Pod], scheduler: Scheduler, verbose: bool
+) -> dict:
     print(f"MASTER: {master.name}")
     print(f"SCHEDULER: {master.scheduler_name}")
     print("-" * 72)
 
-    pending_pods = run_producer_consumer(master, pods, scheduler)
+    pending_pods = run_producer_consumer(master, pods, scheduler, verbose)
 
-    print_allocations(master.workers, pending_pods)
-    print_resources(master.workers)
+    if verbose:
+        print_allocations(master.workers, pending_pods)
+        print_resources(master.workers)
+
     stats = print_statistics(pods, master.workers)
-    print_rejection_reasons(pending_pods)
+
+    if verbose:
+        print_rejection_reasons(pending_pods)
+
     print("\n" + "=" * 72 + "\n")
     return {"scheduler": master.scheduler_name, "stats": stats}
 
 
 def run_producer_consumer(
-    master: Master, pods: list[Pod], scheduler: Scheduler
+    master: Master, pods: list[Pod], scheduler: Scheduler, verbose: bool
 ) -> list[Pod]:
     buffer = PodBuffer(BUFFER_CAPACITY)
     pending_pods: list[Pod] = []
 
     producer = Thread(
         target=produce_pods,
-        args=(pods, buffer),
+        args=(pods, buffer, verbose),
         name=f"producer-{scheduler.name}",
     )
     consumer = Thread(
         target=consume_pods,
-        args=(master, scheduler, buffer, pending_pods),
+        args=(master, scheduler, buffer, pending_pods, verbose),
         name=f"consumer-{scheduler.name}",
     )
 
-    print(f"BUFFER COMPARTILHADO: capacidade maxima de {BUFFER_CAPACITY} Pods")
+    if verbose:
+        print(f"BUFFER COMPARTILHADO: capacidade maxima de {BUFFER_CAPACITY} Pods")
+
     consumer.start()
     producer.start()
     producer.join()
     consumer.join()
-    print()
+
+    if verbose:
+        print()
 
     return pending_pods
 
 
-def produce_pods(pods: list[Pod], buffer: PodBuffer) -> None:
+def produce_pods(pods: list[Pod], buffer: PodBuffer, verbose: bool) -> None:
     for pod in pods:
-        print(f"[Produtor] Pod criado: {pod.name}")
-        print("[Produtor] aguardando espaco no buffer")
+        log_verbose(verbose, f"[Produtor] Pod criado: {pod.name}")
+        log_verbose(verbose, "[Produtor] aguardando espaco no buffer")
         buffer.put(pod)
-        print(f"[Produtor] Pod inserido no buffer: {pod.name}")
+        log_verbose(verbose, f"[Produtor] Pod inserido no buffer: {pod.name}")
 
-    print("[Produtor] aguardando espaco no buffer")
+    log_verbose(verbose, "[Produtor] aguardando espaco no buffer")
     buffer.put(None)
-    print("[Produtor] sentinel None inserido no buffer")
+    log_verbose(verbose, "[Produtor] sentinel None inserido no buffer")
 
 
 def consume_pods(
-    master: Master, scheduler: Scheduler, buffer: PodBuffer, pending_pods: list[Pod]
+    master: Master,
+    scheduler: Scheduler,
+    buffer: PodBuffer,
+    pending_pods: list[Pod],
+    verbose: bool,
 ) -> None:
     while True:
-        print("[Consumidor/Master] aguardando item no buffer")
+        log_verbose(verbose, "[Consumidor/Master] aguardando item no buffer")
         pod = buffer.get()
 
         if pod is None:
-            print("[Consumidor/Master] sentinel None recebido; encerrando consumidor")
+            log_verbose(
+                verbose,
+                "[Consumidor/Master] sentinel None recebido; encerrando consumidor",
+            )
             break
 
-        print(f"[Consumidor/Master] Scheduler consumindo Pod: {pod.name}")
+        log_verbose(verbose, f"[Consumidor/Master] Scheduler consumindo Pod: {pod.name}")
         worker = scheduler.select_worker(pod, master.workers)
 
         if worker is None:
             pod.status = "pending"
             pod.rejection_reason = scheduler.rejection_reason(pod, master.workers)
             pending_pods.append(pod)
-            print("[Consumidor/Master] Worker escolhido: nenhum")
-            print(
-                f"[Consumidor/Master] Pod marcado como pending/rejected: "
-                f"{pod.name} ({pod.rejection_reason})"
+            log_verbose(verbose, "[Consumidor/Master] Worker escolhido: nenhum")
+            log_verbose(
+                verbose,
+                "[Consumidor/Master] Pod marcado como pending/rejected: "
+                f"{pod.name} ({pod.rejection_reason})",
             )
         else:
-            print(f"[Consumidor/Master] Worker escolhido: {worker.name}")
+            log_verbose(verbose, f"[Consumidor/Master] Worker escolhido: {worker.name}")
             worker.allocate(pod)
-            print(f"[Consumidor/Master] Pod alocado: {pod.name} -> {worker.name}")
+            log_verbose(
+                verbose, f"[Consumidor/Master] Pod alocado: {pod.name} -> {worker.name}"
+            )
+
+
+def log_verbose(verbose: bool, message: str) -> None:
+    if verbose:
+        print(message)
 
 
 def print_allocations(workers: list[Worker], pending_pods: list[Pod]) -> None:
