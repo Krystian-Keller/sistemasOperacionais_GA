@@ -31,6 +31,11 @@ python app/main.py
 - Cria 18 Pods com demandas diferentes.
 - Executa um scheduler padrao simplificado que considera apenas CPU e memoria.
 - Executa um scheduler customizado que considera CPU, memoria, disco e latencia.
+- Usa uma thread produtora para criar/enfileirar Pods.
+- Usa uma thread consumidora representando o Master/Scheduler.
+- Usa um buffer compartilhado limitado, sem `queue.Queue`.
+- Usa `threading.Semaphore` para controlar espacos vazios e itens disponiveis.
+- Usa `threading.Lock` como mutex para proteger o acesso ao buffer.
 - Mostra a alocacao final dos Pods por Worker.
 - Mostra recursos usados e disponiveis em cada Worker.
 - Mostra overcommit de disco quando o scheduler padrao aloca alem da capacidade.
@@ -39,6 +44,20 @@ python app/main.py
 - Mostra Pods alocados validos, Pods com violacao, violacoes de latencia e motivos de rejeicao.
 - Compara os dois schedulers usando os mesmos Pods e Workers.
 - Gera uma tabela final lado a lado para facilitar a apresentacao.
+
+## Produtor/Consumidor
+
+Cada execucao de scheduler usa uma thread produtora e uma thread consumidora:
+
+- a produtora cria os Pods na mesma ordem fixa e os insere em um buffer limitado;
+- a consumidora representa o Master/Scheduler e retira Pods do buffer para escalonar;
+- o buffer tem capacidade maxima de 5 Pods;
+- um semaforo controla espacos livres no buffer;
+- outro semaforo controla itens disponiveis para consumo;
+- um mutex protege a lista compartilhada usada como buffer;
+- ao final, a produtora insere um sentinel `None` para encerrar a consumidora.
+
+Essa parte demonstra o paradigma produtor/consumidor sem alterar a ideia central dos algoritmos de escalonamento.
 
 ## Schedulers
 

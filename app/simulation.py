@@ -1,8 +1,33 @@
 from copy import deepcopy
+from threading import Lock, Semaphore, Thread
 
 from models import Master, Pod, Worker
 from schedulers import CustomScheduler, DefaultScheduler, Scheduler
 from statistics import calculate_statistics
+
+BUFFER_CAPACITY = 5
+
+
+class PodBuffer:
+    def __init__(self, capacity: int) -> None:
+        self.capacity = capacity
+        self.items: list[Pod | None] = []
+        self.empty_slots = Semaphore(capacity)
+        self.available_items = Semaphore(0)
+        self.mutex = Lock()
+
+    def put(self, item: Pod | None) -> None:
+        self.empty_slots.acquire()
+        with self.mutex:
+            self.items.append(item)
+        self.available_items.release()
+
+    def get(self) -> Pod | None:
+        self.available_items.acquire()
+        with self.mutex:
+            item = self.items.pop(0)
+        self.empty_slots.release()
+        return item
 
 
 def create_workers() -> list[Worker]:
@@ -63,7 +88,7 @@ def run_simulation(master: Master, pods: list[Pod], scheduler: Scheduler) -> dic
     print(f"SCHEDULER: {master.scheduler_name}")
     print("-" * 72)
 
-    pending_pods = scheduler.schedule(pods, master.workers)
+    pending_pods = run_producer_consumer(master, pods, scheduler)
 
     print_allocations(master.workers, pending_pods)
     print_resources(master.workers)
@@ -71,6 +96,74 @@ def run_simulation(master: Master, pods: list[Pod], scheduler: Scheduler) -> dic
     print_rejection_reasons(pending_pods)
     print("\n" + "=" * 72 + "\n")
     return {"scheduler": master.scheduler_name, "stats": stats}
+
+
+def run_producer_consumer(
+    master: Master, pods: list[Pod], scheduler: Scheduler
+) -> list[Pod]:
+    buffer = PodBuffer(BUFFER_CAPACITY)
+    pending_pods: list[Pod] = []
+
+    producer = Thread(
+        target=produce_pods,
+        args=(pods, buffer),
+        name=f"producer-{scheduler.name}",
+    )
+    consumer = Thread(
+        target=consume_pods,
+        args=(master, scheduler, buffer, pending_pods),
+        name=f"consumer-{scheduler.name}",
+    )
+
+    print(f"BUFFER COMPARTILHADO: capacidade maxima de {BUFFER_CAPACITY} Pods")
+    consumer.start()
+    producer.start()
+    producer.join()
+    consumer.join()
+    print()
+
+    return pending_pods
+
+
+def produce_pods(pods: list[Pod], buffer: PodBuffer) -> None:
+    for pod in pods:
+        print(f"[Produtor] Pod criado: {pod.name}")
+        print("[Produtor] aguardando espaco no buffer")
+        buffer.put(pod)
+        print(f"[Produtor] Pod inserido no buffer: {pod.name}")
+
+    print("[Produtor] aguardando espaco no buffer")
+    buffer.put(None)
+    print("[Produtor] sentinel None inserido no buffer")
+
+
+def consume_pods(
+    master: Master, scheduler: Scheduler, buffer: PodBuffer, pending_pods: list[Pod]
+) -> None:
+    while True:
+        print("[Consumidor/Master] aguardando item no buffer")
+        pod = buffer.get()
+
+        if pod is None:
+            print("[Consumidor/Master] sentinel None recebido; encerrando consumidor")
+            break
+
+        print(f"[Consumidor/Master] Scheduler consumindo Pod: {pod.name}")
+        worker = scheduler.select_worker(pod, master.workers)
+
+        if worker is None:
+            pod.status = "pending"
+            pod.rejection_reason = scheduler.rejection_reason(pod, master.workers)
+            pending_pods.append(pod)
+            print("[Consumidor/Master] Worker escolhido: nenhum")
+            print(
+                f"[Consumidor/Master] Pod marcado como pending/rejected: "
+                f"{pod.name} ({pod.rejection_reason})"
+            )
+        else:
+            print(f"[Consumidor/Master] Worker escolhido: {worker.name}")
+            worker.allocate(pod)
+            print(f"[Consumidor/Master] Pod alocado: {pod.name} -> {worker.name}")
 
 
 def print_allocations(workers: list[Worker], pending_pods: list[Pod]) -> None:
