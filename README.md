@@ -28,13 +28,16 @@ python app/main.py
 
 - Cria um Master.
 - Cria 3 Workers simulados.
-- Cria 16 Pods com demandas diferentes.
+- Cria 18 Pods com demandas diferentes.
 - Executa um scheduler padrao simplificado que considera apenas CPU e memoria.
 - Executa um scheduler customizado que considera CPU, memoria, disco e latencia.
 - Mostra a alocacao final dos Pods por Worker.
 - Mostra recursos usados e disponiveis em cada Worker.
 - Mostra estatisticas finais da simulacao.
+- Mostra gargalos por Worker acima de 90% de CPU, memoria ou disco.
+- Mostra violacoes de latencia e motivos de rejeicao dos Pods pendentes.
 - Compara os dois schedulers usando os mesmos Pods e Workers.
+- Gera uma tabela final lado a lado para facilitar a apresentacao.
 
 ## Schedulers
 
@@ -54,9 +57,9 @@ Considera CPU, memoria, disco e latencia. Um Worker so pode receber um Pod se:
 A pontuacao usada e simples e explicavel:
 
 ```text
-score = 0.30 * cpu_score
-      + 0.30 * memory_score
-      + 0.25 * disk_score
+score = 0.25 * cpu_score
+      + 0.25 * memory_score
+      + 0.35 * disk_score
       + 0.15 * latency_score
 ```
 
@@ -66,6 +69,8 @@ Onde:
 - `memory_score` representa a proporcao de memoria que sobraria no Worker;
 - `disk_score` representa a proporcao de disco que sobraria no Worker;
 - `latency_score` favorece Workers com menor latencia em relacao ao requisito do Pod.
+
+O disco recebe peso maior para deixar a comparacao mais didatica. Tambem existe uma pequena penalidade quando a alocacao deixaria o Worker com mais de 90% de disco usado. Isso evita concentrar disco em um unico Worker quando ha alternativa melhor.
 
 ## Limitacoes
 

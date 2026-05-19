@@ -10,6 +10,7 @@ class Pod:
     latency_requirement: float
     status: str = "pending"
     assigned_worker: str | None = None
+    rejection_reason: str = ""
 
 
 @dataclass
@@ -52,6 +53,7 @@ class Worker:
         self.used_disk += pod.disk
         pod.status = "running"
         pod.assigned_worker = self.name
+        pod.rejection_reason = ""
         self.pods.append(pod)
 
 
