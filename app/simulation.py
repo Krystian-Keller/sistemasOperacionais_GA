@@ -61,7 +61,7 @@ def create_pods() -> list[Pod]:
     ]
 
 
-def run_comparison(verbose: bool = False) -> None:
+def run_comparison(verbose: bool = False) -> list[dict]:
     base_workers = create_workers()
     base_pods = create_pods()
 
@@ -81,6 +81,7 @@ def run_comparison(verbose: bool = False) -> None:
         results.append(run_simulation(master, pods, scheduler, verbose))
 
     print_comparison_table(results)
+    return results
 
 
 def run_simulation(
@@ -102,7 +103,20 @@ def run_simulation(
         print_rejection_reasons(pending_pods)
 
     print("\n" + "=" * 72 + "\n")
-    return {"scheduler": master.scheduler_name, "stats": stats}
+    return {
+        "scheduler": master.scheduler_name,
+        "scheduler_label": scheduler_label(scheduler),
+        "stats": stats,
+        "workers": master.workers,
+    }
+
+
+def scheduler_label(scheduler: Scheduler) -> str:
+    if isinstance(scheduler, DefaultScheduler):
+        return "default"
+    if isinstance(scheduler, CustomScheduler):
+        return "custom"
+    return scheduler.name.lower().replace(" ", "_")
 
 
 def run_producer_consumer(

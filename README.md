@@ -9,10 +9,18 @@ Esta simulacao nao e uma reimplementacao real do `kube-scheduler`. Ela apenas re
 ```text
 app/
   main.py
+  metrics.py
   models.py
   schedulers.py
   simulation.py
   statistics.py
+grafana/
+  dashboards/
+  provisioning/
+Dockerfile
+docker-compose.yml
+prometheus.yml
+requirements.txt
 README.md
 ```
 
@@ -30,6 +38,38 @@ Execucao verbose, mostrando produtor, buffer e consumidor:
 
 ```bash
 python app/main.py --verbose
+```
+
+Execucao local com endpoint Prometheus em `/metrics`:
+
+```bash
+pip install -r requirements.txt
+python app/main.py --serve-metrics
+```
+
+Depois acesse:
+
+```text
+http://localhost:8000/metrics
+```
+
+## Como executar com Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Servicos disponiveis:
+
+- Aplicacao Python: `http://localhost:8000/metrics`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000`
+
+Login padrao do Grafana:
+
+```text
+usuario: admin
+senha: admin
 ```
 
 ## O que a simulacao faz
@@ -52,6 +92,65 @@ python app/main.py --verbose
 - Mostra Pods alocados validos, Pods com violacao, violacoes de latencia e motivos de rejeicao.
 - Compara os dois schedulers usando os mesmos Pods e Workers.
 - Gera uma tabela final lado a lado para facilitar a apresentacao.
+- Exporta metricas Prometheus com labels por scheduler e Worker.
+
+## Observabilidade
+
+A arquitetura de observabilidade possui tres servicos no `docker-compose.yml`:
+
+- `scheduler-simulator`: executa a simulacao Python e expoe `/metrics` na porta 8000.
+- `prometheus`: coleta as metricas da aplicacao a cada 5 segundos.
+- `grafana`: usa o Prometheus como datasource e carrega um dashboard inicial.
+
+As metricas principais exportadas sao:
+
+- `pods_total`
+- `pods_allocated_total`
+- `pods_valid_allocated_total`
+- `pods_with_violation_total`
+- `pods_pending_total`
+- `worker_cpu_used`
+- `worker_cpu_available`
+- `worker_memory_used`
+- `worker_memory_available`
+- `worker_disk_used`
+- `worker_disk_available`
+- `worker_pods_allocated`
+- `worker_disk_overcommit`
+- `latency_violations_total`
+
+As metricas de scheduler usam a label `scheduler`, com valores como `default` e `custom`. As metricas por Worker tambem usam a label `worker`, por exemplo `worker="worker-a-fast"`.
+
+Para verificar se o endpoint esta funcionando:
+
+```bash
+curl http://localhost:8000/metrics
+```
+
+Procure por linhas como:
+
+```text
+pods_allocated_total{scheduler="default"} 14.0
+pods_allocated_total{scheduler="custom"} 13.0
+worker_disk_overcommit{scheduler="default",worker="worker-c-balanced"} 136.0
+```
+
+Para verificar se o Prometheus esta coletando:
+
+1. Acesse `http://localhost:9090`.
+2. Abra `Status > Targets`.
+3. Confirme que o target `scheduler-simulator:8000` esta como `UP`.
+4. Pesquise uma metrica, por exemplo `pods_allocated_total`.
+
+Para acessar o dashboard no Grafana:
+
+1. Acesse `http://localhost:3000`.
+2. Entre com `admin` / `admin`.
+3. Abra `Dashboards`.
+4. Entre na pasta `Scheduler Simulator`.
+5. Abra o dashboard `Scheduler Simulator`.
+
+O dashboard inicial possui paineis simples para Pods alocados, Pods validos, Pods com violacao, Pods pendentes, uso de CPU, memoria e disco por Worker, overcommit de disco e violacoes de latencia.
 
 ## Produtor/Consumidor
 
@@ -106,6 +205,7 @@ O disco recebe peso maior para deixar a comparacao mais didatica. Tambem existe 
 
 - Nao existe comunicacao real com Kubernetes.
 - Nao ha containers reais.
-- Nao ha Docker, Prometheus ou Grafana nesta versao.
 - A simulacao usa dados fixos para facilitar a apresentacao oral.
 - O algoritmo e propositalmente simples para ficar claro em uma disciplina introdutoria.
+- As metricas sao valores finais da execucao da simulacao, nao uma carga dinamica continua.
+- Se a simulacao for alterada, os paineis do Grafana podem precisar de pequenos ajustes nas consultas.

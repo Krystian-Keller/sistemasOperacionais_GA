@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Scheduler Simulator
+    orgId: 1
+    folder: Scheduler Simulator
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
