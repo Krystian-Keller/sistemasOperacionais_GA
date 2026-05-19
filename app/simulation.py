@@ -94,18 +94,32 @@ def print_resources(workers: list[Worker]) -> None:
     print("RECURSOS POR WORKER")
 
     for worker in workers:
+        disk_text = _format_disk_usage(worker)
         print(
             f"- {worker.name}: "
             f"CPU {worker.used_cpu:.1f}/{worker.total_cpu} usada, "
             f"{worker.available_cpu:.1f} disponivel | "
             f"Memoria {worker.used_memory:.1f}/{worker.total_memory} GB usada, "
             f"{worker.available_memory:.1f} GB disponivel | "
-            f"Disco {worker.used_disk:.1f}/{worker.total_disk} GB usado, "
-            f"{worker.available_disk:.1f} GB disponivel | "
+            f"{disk_text} | "
             f"Latencia {worker.network_latency:.0f} ms"
         )
 
     print()
+
+
+def _format_disk_usage(worker: Worker) -> str:
+    if worker.used_disk > worker.total_disk:
+        overcommit = worker.used_disk - worker.total_disk
+        return (
+            f"Disco {worker.used_disk:.1f}/{worker.total_disk} GB usado, "
+            f"OVERCOMMIT de {overcommit:.1f} GB"
+        )
+
+    return (
+        f"Disco {worker.used_disk:.1f}/{worker.total_disk} GB usado, "
+        f"{worker.available_disk:.1f} GB disponivel"
+    )
 
 
 def print_statistics(pods: list[Pod], workers: list[Worker]) -> dict:
@@ -113,7 +127,12 @@ def print_statistics(pods: list[Pod], workers: list[Worker]) -> dict:
 
     print("ESTATISTICAS FINAIS")
     print(f"- Total de Pods: {stats['total_pods']}")
-    print(f"- Pods alocados: {stats['allocated_pods']}")
+    print(f"- Pods alocados totais: {stats['allocated_pods']}")
+    print(f"- Pods alocados validos: {stats['valid_allocated_pods']}")
+    print(
+        "- Pods alocados com violacao de recurso ou latencia: "
+        f"{stats['allocated_pods_with_violation']}"
+    )
     print(f"- Pods pendentes: {stats['pending_pods']}")
     print(f"- Uso medio de CPU por Worker: {stats['average_cpu_usage']:.2f}%")
     print(f"- Uso medio de memoria por Worker: {stats['average_memory_usage']:.2f}%")
@@ -122,6 +141,7 @@ def print_statistics(pods: list[Pod], workers: list[Worker]) -> dict:
     print(f"- Workers com memoria acima de 90%: {stats['workers_memory_above_90']}")
     print(f"- Workers com disco acima de 90%: {stats['workers_disk_above_90']}")
     print(f"- Violacoes de latencia: {stats['latency_violations']}")
+    print(f"- Overcommit de disco total: {stats['total_disk_overcommit']:.1f} GB")
     return stats
 
 
@@ -143,11 +163,14 @@ def print_comparison_table(results: list[dict]) -> None:
 
     headers = ["Metrica"] + [result["scheduler"] for result in results]
     rows = [
-        ("Pods alocados", "allocated_pods"),
+        ("Pods alocados totais", "allocated_pods"),
+        ("Pods alocados validos", "valid_allocated_pods"),
+        ("Pods com violacao", "allocated_pods_with_violation"),
         ("Pods pendentes", "pending_pods"),
         ("Uso medio CPU", "average_cpu_usage"),
         ("Uso medio memoria", "average_memory_usage"),
         ("Uso medio disco", "average_disk_usage"),
+        ("Overcommit disco total", "total_disk_overcommit"),
         ("Workers CPU > 90%", "workers_cpu_above_90"),
         ("Workers memoria > 90%", "workers_memory_above_90"),
         ("Workers disco > 90%", "workers_disk_above_90"),
@@ -162,7 +185,9 @@ def print_comparison_table(results: list[dict]) -> None:
         values = [label]
         for result in results:
             value = result["stats"][key]
-            if isinstance(value, float):
+            if key == "total_disk_overcommit":
+                values.append(f"{value:.1f} GB")
+            elif isinstance(value, float):
                 values.append(f"{value:.2f}%")
             else:
                 values.append(str(value))

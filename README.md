@@ -33,9 +33,10 @@ python app/main.py
 - Executa um scheduler customizado que considera CPU, memoria, disco e latencia.
 - Mostra a alocacao final dos Pods por Worker.
 - Mostra recursos usados e disponiveis em cada Worker.
+- Mostra overcommit de disco quando o scheduler padrao aloca alem da capacidade.
 - Mostra estatisticas finais da simulacao.
 - Mostra gargalos por Worker acima de 90% de CPU, memoria ou disco.
-- Mostra violacoes de latencia e motivos de rejeicao dos Pods pendentes.
+- Mostra Pods alocados validos, Pods com violacao, violacoes de latencia e motivos de rejeicao.
 - Compara os dois schedulers usando os mesmos Pods e Workers.
 - Gera uma tabela final lado a lado para facilitar a apresentacao.
 
