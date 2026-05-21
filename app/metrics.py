@@ -49,13 +49,16 @@ worker_disk_overcommit = Gauge(
 latency_violations_total = Gauge(
     "latency_violations_total", "Violacoes de latencia", ["scheduler"]
 )
+simulation_cycle = Gauge(
+    "simulation_cycle", "Ciclo atual da simulacao continua", ["scheduler"]
+)
 
 
 def start_metrics_server(port: int) -> None:
     start_http_server(port)
 
 
-def export_metrics(results: list[dict]) -> None:
+def export_metrics(results: list[dict], cycle: int | None = None) -> None:
     for result in results:
         scheduler = result["scheduler_label"]
         stats = result["stats"]
@@ -72,6 +75,8 @@ def export_metrics(results: list[dict]) -> None:
         latency_violations_total.labels(scheduler=scheduler).set(
             stats["latency_violations"]
         )
+        if cycle is not None:
+            simulation_cycle.labels(scheduler=scheduler).set(cycle)
 
         for worker in result["workers"]:
             export_worker_metrics(scheduler, worker)

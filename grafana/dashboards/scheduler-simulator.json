@@ -341,7 +341,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 8,
         "x": 12,
         "y": 15
       },
@@ -364,6 +364,38 @@
         }
       ],
       "title": "Violacoes de latencia",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 15
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "simulation_cycle",
+          "legendFormat": "{{scheduler}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Ciclo da simulacao",
       "type": "timeseries"
     }
   ],

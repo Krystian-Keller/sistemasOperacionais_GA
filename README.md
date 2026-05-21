@@ -47,6 +47,12 @@ pip install -r requirements.txt
 python app/main.py --serve-metrics
 ```
 
+Execucao local com metricas em modo continuo:
+
+```bash
+python app/main.py --serve-metrics --continuous
+```
+
 Depois acesse:
 
 ```text
@@ -57,6 +63,18 @@ http://localhost:8000/metrics
 
 ```bash
 docker compose up --build
+```
+
+Por padrao, o Compose usa o modo estatico, que roda a simulacao uma vez e mantem as metricas finais expostas. Para ativar o modo continuo no Compose:
+
+```bash
+SIMULATION_CONTINUOUS=true docker compose up --build
+```
+
+Tambem e possivel ajustar:
+
+```bash
+SIMULATION_CONTINUOUS=true SIMULATION_CYCLE_SECONDS=3 SIMULATION_PODS_PER_CYCLE=5 docker compose up --build
 ```
 
 Servicos disponiveis:
@@ -102,6 +120,13 @@ A arquitetura de observabilidade possui tres servicos no `docker-compose.yml`:
 - `prometheus`: coleta as metricas da aplicacao a cada 5 segundos.
 - `grafana`: usa o Prometheus como datasource e carrega um dashboard inicial.
 
+Existem dois modos de metricas:
+
+- Modo estatico: melhor para comparacao academica, pois executa a mesma simulacao fixa uma vez e compara claramente o scheduler `default` com o `custom`.
+- Modo continuo: melhor para demonstracao visual no Grafana, pois executa ciclos periodicos, gera novos Pods, expira Pods antigos, libera recursos dos Workers e atualiza as metricas ao longo do tempo.
+
+No modo continuo, cada Pod recebe uma duracao em ciclos (`duration_cycles`). A cada ciclo, a duracao dos Pods em execucao diminui. Quando chega a zero, o Pod e removido do Worker e seus recursos de CPU, memoria e disco sao liberados.
+
 As metricas principais exportadas sao:
 
 - `pods_total`
@@ -118,6 +143,7 @@ As metricas principais exportadas sao:
 - `worker_pods_allocated`
 - `worker_disk_overcommit`
 - `latency_violations_total`
+- `simulation_cycle`
 
 As metricas de scheduler usam a label `scheduler`, com valores como `default` e `custom`. As metricas por Worker tambem usam a label `worker`, por exemplo `worker="worker-a-fast"`.
 
@@ -151,6 +177,7 @@ Para acessar o dashboard no Grafana:
 5. Abra o dashboard `Scheduler Simulator`.
 
 O dashboard inicial possui paineis simples para Pods alocados, Pods validos, Pods com violacao, Pods pendentes, uso de CPU, memoria e disco por Worker, overcommit de disco e violacoes de latencia.
+No modo continuo, esses paineis passam a apresentar variacao temporal real.
 
 ## Produtor/Consumidor
 
@@ -207,5 +234,6 @@ O disco recebe peso maior para deixar a comparacao mais didatica. Tambem existe 
 - Nao ha containers reais.
 - A simulacao usa dados fixos para facilitar a apresentacao oral.
 - O algoritmo e propositalmente simples para ficar claro em uma disciplina introdutoria.
-- As metricas sao valores finais da execucao da simulacao, nao uma carga dinamica continua.
+- No modo estatico, as metricas representam os valores finais de uma unica execucao.
+- Para visualizar variacao temporal, use `--continuous` ou `SIMULATION_CONTINUOUS=true`.
 - Se a simulacao for alterada, os paineis do Grafana podem precisar de pequenos ajustes nas consultas.

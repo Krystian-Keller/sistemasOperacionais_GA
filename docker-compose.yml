@@ -4,6 +4,10 @@ services:
     container_name: scheduler-simulator
     ports:
       - "8000:8000"
+    environment:
+      - SIMULATION_CONTINUOUS=${SIMULATION_CONTINUOUS:-true}
+      - SIMULATION_CYCLE_SECONDS=${SIMULATION_CYCLE_SECONDS:-5}
+      - SIMULATION_PODS_PER_CYCLE=${SIMULATION_PODS_PER_CYCLE:-4}
 
   prometheus:
     image: prom/prometheus:v2.55.1

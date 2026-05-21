@@ -11,6 +11,7 @@ class Pod:
     status: str = "pending"
     assigned_worker: str | None = None
     rejection_reason: str = ""
+    duration_cycles: int | None = None
 
 
 @dataclass
@@ -55,6 +56,14 @@ class Worker:
         pod.assigned_worker = self.name
         pod.rejection_reason = ""
         self.pods.append(pod)
+
+    def remove(self, pod: Pod) -> None:
+        self.used_cpu -= pod.cpu
+        self.used_memory -= pod.memory
+        self.used_disk -= pod.disk
+        pod.status = "completed"
+        pod.assigned_worker = None
+        self.pods.remove(pod)
 
 
 @dataclass

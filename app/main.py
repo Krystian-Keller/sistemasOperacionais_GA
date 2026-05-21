@@ -1,4 +1,5 @@
 import argparse
+import os
 import time
 
 from simulation import run_comparison
@@ -21,8 +22,26 @@ if __name__ == "__main__":
     parser.add_argument(
         "--metrics-port",
         type=int,
-        default=8000,
+        default=int(os.getenv("METRICS_PORT", "8000")),
         help="porta do endpoint /metrics",
+    )
+    parser.add_argument(
+        "--continuous",
+        action="store_true",
+        default=os.getenv("SIMULATION_CONTINUOUS", "false").lower() == "true",
+        help="executa ciclos continuos para gerar variacao temporal nas metricas",
+    )
+    parser.add_argument(
+        "--cycle-seconds",
+        type=int,
+        default=int(os.getenv("SIMULATION_CYCLE_SECONDS", "5")),
+        help="intervalo entre ciclos no modo continuo",
+    )
+    parser.add_argument(
+        "--pods-per-cycle",
+        type=int,
+        default=int(os.getenv("SIMULATION_PODS_PER_CYCLE", "4")),
+        help="quantidade de Pods gerados por ciclo no modo continuo",
     )
     args = parser.parse_args()
 
@@ -30,11 +49,23 @@ if __name__ == "__main__":
         from metrics import export_metrics, start_metrics_server
 
         start_metrics_server(args.metrics_port)
-        results = run_comparison(verbose=args.verbose)
-        export_metrics(results)
         print(f"Endpoint /metrics ativo em http://0.0.0.0:{args.metrics_port}/metrics")
 
-        while True:
-            time.sleep(60)
+        if args.continuous:
+            from continuous import run_continuous_simulation
+
+            run_continuous_simulation(
+                cycle_seconds=args.cycle_seconds,
+                pods_per_cycle=args.pods_per_cycle,
+                verbose=args.verbose,
+            )
+        else:
+            results = run_comparison(verbose=args.verbose)
+            export_metrics(results)
+
+            while True:
+                time.sleep(60)
     else:
+        if args.continuous:
+            print("Aviso: --continuous so tem efeito junto com --serve-metrics.\n")
         run_comparison(verbose=args.verbose)
